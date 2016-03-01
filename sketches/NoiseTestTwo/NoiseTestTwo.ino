@@ -31,11 +31,20 @@ void setup() {
     Nodule::HueMode hm = (Nodule::HueMode) random(0, Nodule::HueModeSize);
     nodules[i].setHueMode(hm);
 
+    uint16_t hui = (uint16_t) random(0, 10);
+    nodules[i].setHueUpdateInterval(hui);
+
     Nodule::SaturationMode sm = (Nodule::SaturationMode) random(0, Nodule::SaturationModeSize);
     nodules[i].setSaturationMode(sm);
 
+    uint16_t sui = (uint16_t) random(0, 500);
+    nodules[i].setSaturationUpdateInterval(sui);
+
     Nodule::ValueMode vm = (Nodule::ValueMode) random(0, Nodule::ValueModeSize);
     nodules[i].setValueMode(vm);
+
+    uint16_t vui = (uint16_t) random(0, 100);
+    nodules[i].setValueUpdateInterval(vui);
   }
 }
 
