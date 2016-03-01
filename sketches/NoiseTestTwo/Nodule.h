@@ -9,32 +9,35 @@ public:
   typedef uint8_t Value;
 
   typedef enum HueMode {
+    HueModeConstant,
     HueModePerlin,
     HueModeRainbow
   } HueMode;
 
   typedef enum SaturationMode {
-    SaturationModeConstant
+    SaturationModeConstant,
+    SaturationModeSinusoidal
   } SaturationMode;
 
   typedef enum ValueMode {
-    ValueModeConstant
+    ValueModeConstant,
+    ValueModeSinusoidal
   } ValueMode;
 
   Nodule();
   Nodule(CRGB *leds);
 
   void setHue(Hue hue);
-  void setHueUpdateInterval(uint16_t interval);
   void setHueMode(HueMode mode);
+  void setHueUpdateInterval(uint16_t interval);
 
   void setSaturation(Saturation saturation);
-  void setSaturationUpdateInterval(uint16_t interval);
   void setSaturationMode(SaturationMode mode);
+  void setSaturationUpdateInterval(uint16_t interval);
 
   void setValue(Value value);
-  void setValueUpdateInterval(uint16_t interval);
   void setValueMode(ValueMode mode);
+  void setValueUpdateInterval(uint16_t interval);
 
   void update();
 
@@ -44,7 +47,9 @@ private:
   void updatePerlin();
   void updateRainbow();
   void updateSaturation(uint32_t &elapsed);
+  void updateSaturationSinusoidal();
   void updateValue(uint32_t &elapsed);
+  void updateValueSinusoidal();
 
   CRGB           *leds;                     // our slice of the LED array
   uint32_t       previousTime;              // the time of our last update
@@ -54,10 +59,12 @@ private:
   uint16_t       hueUpdateInterval;
 
   Saturation     saturation;
+  uint8_t        saturationLutIdx;
   SaturationMode saturationMode;
   uint16_t       saturationUpdateInterval;
 
   Value          value;
+  uint8_t        valueLutIdx;
   ValueMode      valueMode;
   uint16_t       valueUpdateInterval;
 

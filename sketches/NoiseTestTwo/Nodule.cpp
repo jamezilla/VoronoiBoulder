@@ -1,11 +1,12 @@
 #include "Nodule.h"
+#include "LUT.h"
 
 #define DEFAULT_HUE_MODE                   HueModeRainbow
-#define DEFAULT_HUE_UPDATE_INTERVAL        100
-#define DEFAULT_SATURATION_MODE            SaturationModeConstant
-#define DEFAULT_SATURATION_UPDATE_INTERVAL 100
-#define DEFAULT_VALUE_MODE                 ValueModeConstant
-#define DEFAULT_VALUE_UPDATE_INTERVAL      100
+#define DEFAULT_HUE_UPDATE_INTERVAL        50
+#define DEFAULT_SATURATION_MODE            SaturationModeSinusoidal
+#define DEFAULT_SATURATION_UPDATE_INTERVAL 1
+#define DEFAULT_VALUE_MODE                 ValueModeSinusoidal
+#define DEFAULT_VALUE_UPDATE_INTERVAL      2
 
 Nodule::Nodule()
   : hue(UINT8_MAX),
@@ -18,8 +19,10 @@ Nodule::Nodule()
     previousTime(0),
     saturation(UINT8_MAX),
     saturationMode(DEFAULT_SATURATION_MODE),
+    saturationLutIdx(0),
     saturationUpdateInterval(DEFAULT_SATURATION_UPDATE_INTERVAL),
     value(UINT8_MAX),
+    valueLutIdx(0),
     valueMode(DEFAULT_VALUE_MODE),
     valueUpdateInterval(DEFAULT_VALUE_UPDATE_INTERVAL)
 {}
@@ -36,8 +39,10 @@ Nodule::Nodule(CRGB *leds)
     previousTime(0),
     saturation(UINT8_MAX),
     saturationMode(DEFAULT_SATURATION_MODE),
+    saturationLutIdx(0),
     saturationUpdateInterval(DEFAULT_SATURATION_UPDATE_INTERVAL),
     value(UINT8_MAX),
+    valueLutIdx(0),
     valueMode(DEFAULT_VALUE_MODE),
     valueUpdateInterval(DEFAULT_VALUE_UPDATE_INTERVAL)
 {}
@@ -65,6 +70,18 @@ void Nodule::setSaturation(Saturation saturation) {
 
 void Nodule::setSaturationMode(SaturationMode mode) {
   this->saturationMode = mode;
+
+  switch(mode) {
+  case SaturationModeSinusoidal:
+    // find the closest value in the sine wave lookup table
+    for (int i = 0; i < 256; i++) {
+      if (abs(this->saturation - sineLUT[i]) <= 3) {
+        this->saturationLutIdx = i;
+        break;
+      }
+    }
+    break;
+  }
 }
 
 
@@ -115,6 +132,9 @@ void Nodule::updateHue(uint32_t &elapsed) {
 
   // update the hue
   switch(this->hueMode) {
+  case HueModeConstant:
+    // noop
+    break;
   case HueModeRainbow:
     updateRainbow();
     break;
@@ -162,11 +182,20 @@ void Nodule::updateSaturation(uint32_t &elapsed) {
 
   // update the saturation
   switch(this->saturationMode) {
+  case SaturationModeSinusoidal:
+    updateSaturationSinusoidal();
+    break;
   case SaturationModeConstant:
   default:
     // noop
     break;
   }
+}
+
+
+void Nodule::updateSaturationSinusoidal() {
+  this->saturation = sineLUT[++saturationLutIdx];
+  saturationLutIdx %= 256;
 }
 
 
@@ -178,9 +207,19 @@ void Nodule::updateValue(uint32_t &elapsed) {
 
   // update the value
   switch(this->valueMode) {
+  case ValueModeSinusoidal:
+    updateValueSinusoidal();
+    break;
   case ValueModeConstant:
   default:
     // noop
     break;
   }
+}
+
+
+void Nodule::updateValueSinusoidal() {
+  valueLutIdx += 4;
+  this->value = sineLUT[valueLutIdx];
+  valueLutIdx %= 256;
 }
