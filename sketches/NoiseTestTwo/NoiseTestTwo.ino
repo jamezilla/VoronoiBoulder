@@ -27,6 +27,15 @@ void setup() {
   for (uint8_t i = 0; i < NUM_NODES; i++) {
     CRGB *nodeStart = &(leds[i*NUM_LEDS_PER_NODE]);
     nodules[i] = Nodule(nodeStart);
+
+    Nodule::HueMode hm = (Nodule::HueMode) random(0, Nodule::HueModeSize);
+    nodules[i].setHueMode(hm);
+
+    Nodule::SaturationMode sm = (Nodule::SaturationMode) random(0, Nodule::SaturationModeSize);
+    nodules[i].setSaturationMode(sm);
+
+    Nodule::ValueMode vm = (Nodule::ValueMode) random(0, Nodule::ValueModeSize);
+    nodules[i].setValueMode(vm);
   }
 }
 

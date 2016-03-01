@@ -11,17 +11,20 @@ public:
   typedef enum HueMode {
     HueModeConstant,
     HueModePerlin,
-    HueModeRainbow
+    HueModeRainbow,
+    HueModeSize
   } HueMode;
 
   typedef enum SaturationMode {
     SaturationModeConstant,
-    SaturationModeSinusoidal
+    SaturationModeSinusoidal,
+    SaturationModeSize
   } SaturationMode;
 
   typedef enum ValueMode {
     ValueModeConstant,
-    ValueModeSinusoidal
+    ValueModeSinusoidal,
+    ValueModeSize
   } ValueMode;
 
   Nodule();

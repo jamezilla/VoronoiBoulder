@@ -1,7 +1,7 @@
 #include "Nodule.h"
 #include "LUT.h"
 
-#define DEFAULT_HUE_MODE                   HueModeRainbow
+#define DEFAULT_HUE_MODE                   HueModePerlin
 #define DEFAULT_HUE_UPDATE_INTERVAL        50
 #define DEFAULT_SATURATION_MODE            SaturationModeSinusoidal
 #define DEFAULT_SATURATION_UPDATE_INTERVAL 1
