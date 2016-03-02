@@ -9,8 +9,4 @@
 
 #define BRIGHTNESS          50
 
-#define NUM_LEDS_PER_NODE   8
-#define NUM_NODES           5
-#define NUM_LEDS            40      // overall number of leds
-
-#define MAX_SPEED           1.0f    // TODO: move this to a timer?
+#define LEDS_PER_NODULE     8

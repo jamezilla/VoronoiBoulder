@@ -3,19 +3,30 @@
 #include <FastLED.h>
 #include "config.h"
 
-#define HUE_MODE            ModeSawtooth
-#define HUE_INTERVAL        1U
+// defaults
 
-#define SATURATION_MODE     ModeConstant
-#define SATURATION_INTERVAL 10U
+#define HUE_VALUE_MODE           ModeAlternateDrift
+#define HUE_INTERVAL             500U
+#define HUE_INTERVAL_MODE        ModeSinusoidal
 
-#define VALUE_MODE          ModeSawtooth
-#define VALUE_INTERVAL      10U
+#define SATURATION_VALUE_MODE    ModeConstant
+#define SATURATION_INTERVAL      10U
+#define SATURATION_INTERVAL_MODE ModeConstant
+
+#define VALUE_VALUE_MODE         ModeConstant
+#define VALUE_INTERVAL           10U
+#define VALUE_INTERVAL_MODE      ModeConstant
+
 
 class Nodule {
 
 public:
+
+  // available generators
+
   typedef enum Mode {
+    ModeAlternate,
+    ModeAlternateDrift,
     ModeConstant,
     ModePerlin,
     ModeReverseSawtooth,
@@ -23,29 +34,46 @@ public:
     ModeSinusoidal
   } Mode;
 
+
+  // main data structure for a channel (ie. hue, saturation, or value)
+
   struct Channel {
-    uint8_t  lutIndex;          // for lookup table generators, our current index into the table
-    Mode     mode;              // which generator we're using for mutating 'value'
-    uint16_t noiseSeed;         // where do we start in the noise field?
-    uint32_t previousUpdate;    // the time of our last update
-    uint16_t updateInterval;    // how often to update this value - in milliseconds
+    uint16_t interval;          // how often to update this value - in milliseconds
+    Mode     intervalMode;      // drive the update interval using a generator
+    uint8_t  intervalLutIndex;  // for lookup table generators, our current index into the table
+    uint32_t intervalNoiseSeed; // where do we start in the noise field?
+
     uint8_t  value;             // the actual value of the channel
+    uint8_t  valueLutIndex;     // for lookup table generators, our current index into the table
+    Mode     valueMode;         // which generator we're using for mutating 'value'
+    uint16_t valueNoiseSeed;    // where do we start in the noise field?
+
+    uint32_t previousUpdate;    // the time of our last update
   };
+
+
+  // constructors
 
   Nodule() {};
   Nodule(CRGB *leds) : leds(leds) {};
 
+
+  // instance methods
+
   void setHue(uint8_t hue);
+  void setHueInterval(uint16_t interval);
+  void setHueIntervalMode(Mode mode);
   void setHueMode(Mode mode);
-  void setHueUpdateInterval(uint16_t interval);
 
   void setSaturation(uint8_t saturation);
+  void setSaturationInterval(uint16_t interval);
+  void setSaturationIntervalMode(Mode mode);
   void setSaturationMode(Mode mode);
-  void setSaturationUpdateInterval(uint16_t interval);
 
   void setValue(uint8_t value);
+  void setValueInterval(uint16_t interval);
+  void setValueIntervalMode(Mode mode);
   void setValueMode(Mode mode);
-  void setValueUpdateInterval(uint16_t interval);
 
   void update(uint32_t now);
   void updateLeds();
@@ -54,12 +82,14 @@ private:
   void updateChannel(Channel &channel);
 
   // our slice of the LED array
-  CRGB     *leds      = nullptr;
-  uint32_t now       = 0;
+  CRGB *leds = nullptr;
+
+  // storage for the current time of the loop (ie. millis())
+  uint32_t now = 0;
 
   // the channel data structures
-  Channel  hue        = { 0, HUE_MODE,        random16(), 0, HUE_INTERVAL,        random8() };
-  Channel  saturation = { 0, SATURATION_MODE, random16(), 0, SATURATION_INTERVAL, UINT8_MAX };
-  Channel  value      = { 0, VALUE_MODE,      random16(), 0, SATURATION_INTERVAL, UINT8_MAX };
+  Channel  hue        = { HUE_INTERVAL,        HUE_INTERVAL_MODE,        0, (uint32_t)random16(), random8(), 0, HUE_VALUE_MODE,        random16(), 0 };
+  Channel  saturation = { SATURATION_INTERVAL, SATURATION_INTERVAL_MODE, 0, (uint32_t)random16(), UINT8_MAX, 0, SATURATION_VALUE_MODE, random16(), 0 };
+  Channel  value      = { VALUE_INTERVAL,      VALUE_INTERVAL_MODE,      0, (uint32_t)random16(), UINT8_MAX, 0, VALUE_VALUE_MODE,      random16(), 0 };
 
 };

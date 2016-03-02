@@ -1,9 +1,14 @@
 #include "Generators.h"
 #include <avr/pgmspace.h>
 
+// fiddle with this... we don't want to scale all the up to UINT16_MAX - what's the max interval we might want?
+#define INTERVAL_MAX 250
+
+
 // The max gap between values in the sine LUT is 4, so any random value can only
 // be 2 away from a value in the table
 #define SINE_LUT_MAX_GAP 2U
+
 
 const PROGMEM uint8_t sineLUT[] = {
   127,130,133,136,139,143,146,149,152,155,158,161,164,167,170,173,176,178,181,184,
@@ -20,50 +25,120 @@ const PROGMEM uint8_t sineLUT[] = {
 };
 
 
-// move channel.lutIndex to the first position in the lookup table which is within
+// swap between the current color and its complimentary
+void Generators::alternate(uint8_t &value) {
+  uint16_t temp = value + 128U;
+  value = temp % UINT8_MAX;
+}
+
+
+// swap between the current color and its complimentary but drift a bit with
+// each swap
+void Generators::alternateDrift(uint8_t &value) {
+  uint16_t temp = value + 126U;
+  value = temp % UINT8_MAX;
+}
+
+
+// set lutIndex to the first position in the lookup table which is within
 // SINE_LUT_MAX_GAP of the current value - use this to avoid a big jump in value
 // when switching to sinusoidal modes
-void Generators::jumpToSineLutPosition(Nodule::Channel &channel) {
+void Generators::jumpToSineLutPosition(uint8_t &value, uint8_t &lutIndex) {
   for (int i = 0; i < 256; i++) {
-    if (abs(channel.value - pgm_read_byte_near(sineLUT + i)) <= SINE_LUT_MAX_GAP) {
-      channel.lutIndex = i;
+    if (abs(value - pgm_read_byte_near(sineLUT + i)) <= SINE_LUT_MAX_GAP) {
+      lutIndex = i;
       break;
     }
   }
 }
 
+// overloaded for 16bit
+void Generators::jumpToSineLutPosition(uint16_t &value, uint8_t &lutIndex) {
+  // scale everything to a byte
+  uint8_t v = map(value, 0, UINT16_MAX, 0, UINT8_MAX);
+
+  for (int i = 0; i < 256; i++) {
+    if (abs(v - pgm_read_byte_near(sineLUT + i)) <= SINE_LUT_MAX_GAP) {
+      lutIndex = i;
+      break;
+    }
+  }
+}
+
+
 // sine wave generator
-void Generators::sinusoidal(Nodule::Channel &channel) {
+void Generators::sinusoidal(uint8_t &value, uint8_t &lutIndex) {
   // update our index into the lookup table
   // NOTE: we let this intentionally overflow to wrap around to the beginning of
   // the table
-  channel.lutIndex += 1;
+  lutIndex += 1U;
 
   // store the value
-  channel.value = sineLUT[channel.lutIndex];
+  value = pgm_read_byte_near(sineLUT + lutIndex);
+}
+
+
+// overloaded for 16bit
+void Generators::sinusoidal(uint16_t &value, uint8_t &lutIndex) {
+  // update our index into the lookup table
+  // NOTE: we let this intentionally overflow to wrap around to the beginning of
+  // the table
+  lutIndex += 1U;
+
+  // look up the value and then scale it up
+  uint8_t unscaled = pgm_read_byte_near(sineLUT + lutIndex);
+  value = map(unscaled, 0, UINT8_MAX, 0, INTERVAL_MAX);
 }
 
 
 // perlin noise - move randomly, but smoothly from one value to the next
-void Generators::perlin(Nodule::Channel &channel) {
-  channel.noiseSeed += 1;
+void Generators::perlin(uint8_t &value, uint16_t &noiseSeed) {
+  noiseSeed += 1U;
 
   // inoise8() always returns the same value for a given seed
-  channel.value = inoise8(channel.noiseSeed);
+  value = inoise8(noiseSeed);
+}
+
+
+// overloaded for 16bit
+void Generators::perlin(uint16_t &value, uint32_t &noiseSeed) {
+  noiseSeed += 1U;
+
+  // inoise8() always returns the same value for a given seed
+  value = inoise16(noiseSeed);
 }
 
 
 // a linear ramp, which goes from 255 to 0, and wraps back to 255
-void Generators::reverseSawtooth(Nodule::Channel &channel) {
-  if (channel.value == 0) {
-    channel.value = UINT8_MAX;
+void Generators::reverseSawtooth(uint8_t &value) {
+  if (value == 0) {
+    value = UINT8_MAX;
   } else {
-    channel.value -= 1;
+    value -= 1U;
+  }
+}
+
+
+// overloaded for 16bit
+void Generators::reverseSawtooth(uint16_t &value) {
+  if (value == 0) {
+    value = INTERVAL_MAX;
+  } else {
+    value -= 1U;
   }
 }
 
 
 // a linear ramp, which leverages integer overflow to wrap back to zero
-void Generators::sawtooth(Nodule::Channel &channel) {
-  channel.value += 1;
+void Generators::sawtooth(uint8_t &value) {
+  value += 1U;
+}
+
+
+// overloaded for 16bit
+void Generators::sawtooth(uint16_t &value) {
+  value += 1U;
+  if (value >= INTERVAL_MAX) {
+    value = 0;
+  }
 }
