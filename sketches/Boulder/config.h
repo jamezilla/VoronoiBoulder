@@ -9,4 +9,4 @@
 
 #define BRIGHTNESS          50
 
-#define LEDS_PER_NODULE     8
+#define LEDS_PER_CELL     8

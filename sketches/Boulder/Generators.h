@@ -4,7 +4,7 @@
 // Generators.h
 //
 
-#include "Nodule.h"
+#include "Cell.h"
 
 class Generators {
 public:

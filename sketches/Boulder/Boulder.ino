@@ -4,19 +4,19 @@
 #include <FastLED.h>
 #include <SerialCommand.h>
 #include "config.h"
-#include "Nodule.h"
+#include "Cell.h"
 
-// the address in EEPROM where we store the nodule count
-#define NUM_NODULES_ADDR 0
+// the address in EEPROM where we store the cell count
+#define NUM_CELLS_ADDR 0
 
 //
 // Variables
 //
 
 uint16_t      numLEDs;
-uint8_t       numNodules;
+uint8_t       numCells;
 CRGB          *leds;
-Nodule        *nodules;
+Cell        *cells;
 SerialCommand sCmd;
 
 
@@ -32,19 +32,19 @@ void setup() {
 
   setupStorage();   // always do this first
   setupFastLED();
-  setupNodules();
+  setupCells();
   setupSerialCommands();
 
-  Serial.print(numNodules);
-  Serial.println(" nodules started");
+  Serial.print(numCells);
+  Serial.println(" cells started");
 }
 
 
 void loop() {
   uint32_t now = millis();
 
-  for (uint8_t i = 0; i < numNodules; i++) {
-    nodules[i].update(now);
+  for (uint8_t i = 0; i < numCells; i++) {
+    cells[i].update(now);
   }
 
   FastLED.show();
@@ -58,21 +58,21 @@ void setupFastLED() {
 }
 
 
-void setupNodules() {
-  for (uint8_t i = 0; i < numNodules; i++) {
-    CRGB *nodeStart = &(leds[i * LEDS_PER_NODULE]);
-    nodules[i] = Nodule(nodeStart);
-    // nodules[i].setHueInterval(i*7+20);
-    // nodules[i].setValueMode(Nodule::ModeSinusoidal);
-    // nodules[i].setValueInterval(i*33);
+void setupCells() {
+  for (uint8_t i = 0; i < numCells; i++) {
+    CRGB *nodeStart = &(leds[i * LEDS_PER_CELL]);
+    cells[i] = Cell(nodeStart);
+    // cells[i].setHueInterval(i*7+20);
+    // cells[i].setValueMode(Cell::ModeSinusoidal);
+    // cells[i].setValueInterval(i*33);
   }
 }
 
 
 void setupSerialCommands() {
-  sCmd.addCommand("nodules", setNoduleCount);
+  sCmd.addCommand("cells", setCellCount);
   sCmd.addCommand("reset", resetFunc);
-  sCmd.addCommand("set", setNodule);
+  sCmd.addCommand("set", setCell);
   sCmd.setDefaultHandler(unrecognized);      // Handler for command that isn't matched
 }
 
@@ -81,38 +81,38 @@ void setupStorage() {
   // Wait for EEPROM to be ready
   while (!eeprom_is_ready());
   cli();
-  numNodules = EEPROM.read(NUM_NODULES_ADDR);
+  numCells = EEPROM.read(NUM_CELLS_ADDR);
   sei();
-  nodules    = new Nodule[numNodules];
-  numLEDs    = numNodules * LEDS_PER_NODULE;
+  cells    = new Cell[numCells];
+  numLEDs    = numCells * LEDS_PER_CELL;
   leds       = new CRGB[numLEDs];
 }
 
-void setNodule() {
+void setCell() {
 
 }
 
-void setNoduleCount() {
-  int noduleCount;
+void setCellCount() {
+  int cellCount;
   char *arg = sCmd.next();
 
   if (arg == NULL) {
-    Serial.println("No arguments to 'nodules'");
+    Serial.println("No arguments to 'cells'");
     return;
   }
 
-  noduleCount = atoi(arg);
-  if (noduleCount < 0 || noduleCount > UINT8_MAX) {
-    Serial.println("Got a weird number for 'nodules'");
+  cellCount = atoi(arg);
+  if (cellCount < 0 || cellCount > UINT8_MAX) {
+    Serial.println("Got a weird number for 'cells'");
     return;
   }
 
   while (!eeprom_is_ready());
   cli();
-  EEPROM.update(NUM_NODULES_ADDR, noduleCount);
+  EEPROM.update(NUM_CELLS_ADDR, cellCount);
   sei();
-  Serial.print("nodules: ");
-  Serial.println(noduleCount);
+  Serial.print("cells: ");
+  Serial.println(cellCount);
   Serial.println("don't forget to 'reset'...");
 }
 

@@ -18,7 +18,7 @@
 #define VALUE_INTERVAL_MODE      ModeConstant
 
 
-class Nodule {
+class Cell {
 
 public:
 
@@ -54,8 +54,8 @@ public:
 
   // constructors
 
-  Nodule() {};
-  Nodule(CRGB *leds) : leds(leds) {};
+  Cell() {};
+  Cell(CRGB *leds) : leds(leds) {};
 
 
   // instance methods

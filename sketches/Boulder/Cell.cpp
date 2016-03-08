@@ -1,37 +1,37 @@
-#include "Nodule.h"
+#include "Cell.h"
 #include "Generators.h"
 
-void Nodule::setHue(uint8_t hue) {
+void Cell::setHue(uint8_t hue) {
   this->hue.value = hue;
 }
 
 
-void Nodule::setHueMode(Mode mode) {
+void Cell::setHueMode(Mode mode) {
   this->hue.valueMode = mode;
 }
 
 
-void Nodule::setHueIntervalMode(Mode mode) {
+void Cell::setHueIntervalMode(Mode mode) {
   this->hue.intervalMode = mode;
 }
 
 
-void Nodule::setHueInterval(uint16_t interval) {
+void Cell::setHueInterval(uint16_t interval) {
   this->hue.interval = interval;
 }
 
 
-void Nodule::setSaturation(uint8_t saturation) {
+void Cell::setSaturation(uint8_t saturation) {
   this->saturation.value = saturation;
 }
 
 
-void Nodule::setSaturationIntervalMode(Mode mode) {
+void Cell::setSaturationIntervalMode(Mode mode) {
   this->saturation.intervalMode = mode;
 }
 
 
-void Nodule::setSaturationMode(Mode mode) {
+void Cell::setSaturationMode(Mode mode) {
   this->saturation.valueMode = mode;
 
   switch(mode) {
@@ -42,34 +42,34 @@ void Nodule::setSaturationMode(Mode mode) {
 }
 
 
-void Nodule::setSaturationInterval(uint16_t interval) {
+void Cell::setSaturationInterval(uint16_t interval) {
   this->saturation.interval = interval;
 }
 
 
-void Nodule::setValue(uint8_t value) {
+void Cell::setValue(uint8_t value) {
   this->value.value = value;
 }
 
 
-void Nodule::setValueIntervalMode(Mode mode) {
+void Cell::setValueIntervalMode(Mode mode) {
   this->value.intervalMode = mode;
 }
 
 
-void Nodule::setValueMode(Mode mode) {
+void Cell::setValueMode(Mode mode) {
   this->value.valueMode = mode;
 }
 
 
-void Nodule::setValueInterval(uint16_t interval) {
+void Cell::setValueInterval(uint16_t interval) {
   this->value.interval = interval;
 }
 
 
-// now must be passed in, otherwise the nodules will accumulate error and drop
+// now must be passed in, otherwise the cells will accumulate error and drop
 // out of sync with each other
-void Nodule::update(uint32_t now) {
+void Cell::update(uint32_t now) {
   this->now = now;
 
   updateChannel(this->hue);
@@ -79,7 +79,7 @@ void Nodule::update(uint32_t now) {
   updateLeds();
 }
 
-void Nodule::updateChannel(Channel &channel) {
+void Cell::updateChannel(Channel &channel) {
   uint32_t elapsed = now - channel.previousUpdate;
 
   // has enough time elapsed for us to update?
@@ -141,8 +141,8 @@ void Nodule::updateChannel(Channel &channel) {
 }
 
 
-void Nodule::updateLeds() {
-  for (uint8_t j = 0; j < LEDS_PER_NODULE; j++) {
+void Cell::updateLeds() {
+  for (uint8_t j = 0; j < LEDS_PER_CELL; j++) {
     this->leds[j] = CHSV(this->hue.value, this->saturation.value, this->value.value);
   }
 }
