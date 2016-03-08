@@ -8,5 +8,3 @@
 // #define CHIP_APA102                 // small boulder
 
 #define BRIGHTNESS          50
-
-#define LEDS_PER_CELL     8

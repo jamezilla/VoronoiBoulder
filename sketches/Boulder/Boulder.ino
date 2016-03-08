@@ -2,9 +2,18 @@
 #include <avr/interrupt.h>
 #include <EEPROM.h>
 #include <FastLED.h>
+#include <MotionSensor.h>
+#include <MySensor.h>
 #include <SerialCommand.h>
+#include <SPI.h>
 #include "config.h"
+#include "power_mgt.h"
 #include "Cell.h"
+
+
+#define BOULDER_ID 1
+#define NUMSENSORS 1
+#define PAUSETIME  1000
 
 // the address in EEPROM where we store the cell count
 #define NUM_CELLS_ADDR 0
@@ -14,12 +23,14 @@
 // Variables
 //
 
-uint16_t      numLeds;
-uint8_t       numCells;
+uint16_t      numLeds;                  // total # of leds on the strand
+uint8_t       numCells;                 // number of cells on the whole boulder
 CRGB          *leds;
 Cell          *cells;
-SerialCommand sCmd;
-
+MotionSensor  sensors[NUMSENSORS];     // motion sensors
+MySensor      gw;                      // radio
+SerialCommand sCmd;                     // command processor
+bool          ripple = false;
 
 //
 // Functions
@@ -34,6 +45,12 @@ void setup() {
   setupStorage();   // always do this first
   setupFastLED();
   setupCells();
+
+  //Config Radio Communication
+  gw.begin(onIncomingMessageEvent,BOULDER_ID);
+  gw.sendSketchInfo("BoulderFirmware", "0.1");
+
+  setupSensors();
   setupSerialCommands();
 
   Serial.print(numCells);
@@ -46,18 +63,42 @@ void setup() {
 void loop() {
   uint32_t now = millis();
 
+  // update sensors
+  for (int i = 0; i < NUMSENSORS; i++) {
+    sensors[i].updateSensor();
+  }
+
+  // update radio
+  gw.process();
+
+  // update leds
   for (uint8_t i = 0; i < numCells; i++) {
     cells[i].update(now);
   }
 
+#ifdef PWRMGT
+  show_at_max_brightness_for_power();
+#else
   FastLED.show();
+#endif
+
+  // process any serial commands
   sCmd.readSerial();
 }
 
 
 void setupFastLED() {
+#ifdef CHIP_APA102
+  FastLED.addLeds<APA102, 6, 7>(leds, numLeds).setCorrection(TypicalLEDStrip);
+#else
   FastLED.addLeds<WS2812B, 6, RGB>(leds, numLeds).setCorrection(TypicalLEDStrip);
+#endif
+
+#ifdef PWRMGT
+  set_max_power_in_volts_and_milliamps(VOLTAGE, MAXCURRENT);
+#else
   FastLED.setBrightness(BRIGHTNESS);
+#endif
 }
 
 
@@ -67,9 +108,25 @@ void setupCells() {
   for (uint8_t i = 0; i < numCells; i++) {
     CRGB *nodeStart = &(leds[i * sliceSize]);
     cells[i] = Cell(nodeStart, sliceSize);
+    cells[i].setHue(128);
+    cells[i].setHueMode(Cell::ModePerlin);
+    cells[i].setValueMode(Cell::ModeSawtooth);
+    cells[i].setValueInterval(1);
+    cells[i].setValueMin(200);
+    cells[i].setValueMax(UINT8_MAX);
     // cells[i].setHueInterval(i*7+20);
     // cells[i].setValueMode(Cell::ModeSinusoidal);
     // cells[i].setValueInterval(i*33);
+  }
+}
+
+
+void setupSensors() {
+  for (int i = 0; i < NUMSENSORS; i++) {
+    sensors[i] = MotionSensor(i, i+2, 30000);
+    sensors[i].setPauseTime(PAUSETIME);
+    sensors[i].setMotionSensorDelegate(onMotionSensorEvent);
+    gw.present(i, S_MOTION);
   }
 }
 
@@ -160,4 +217,69 @@ void setLedCount() {
 // This gets set as the default handler, and gets called when no other command matches.
 void unrecognized(const char *command) {
   Serial.println("What?");
+}
+
+
+//Radio Event/////////////////////////////////////////////////
+void onIncomingMessageEvent(const MyMessage &message) {
+
+  //Change Boulder RGB Color
+  if (message.type == V_RGB) {
+    // mBoulder.setBoulderColor(message.getString());
+  }
+
+}
+
+//Motion Sensor Event/////////////////////////////////////////
+int onMotionSensorEvent(const MotionSensor::sensorEventArgs e) {
+
+  int id = e.id;
+  int state = e.state;
+  unsigned long timeStamp = e.timeStamp;
+
+  Serial.print("Sensor ");
+  Serial.print(id);
+
+  switch (state) {
+  //Sensor Calibrating Event
+  case MotionSensor::SENSOR_MOTION_CALIBRATING:
+    {
+      Serial.println(" calibrating");
+      break;
+    }
+    // Sensor Armed Event
+  case MotionSensor::SENSOR_MOTION_ACTIVE:
+    {
+      Serial.println(" active");
+
+      MyMessage sensorArmedMsg(id, V_ARMED);
+      gw.send(sensorArmedMsg.set(1));
+      break;
+    }
+    //Sensor Motion Detected Event
+  case MotionSensor::SENSOR_MOTION_DETECTED:
+    {
+      Serial.println(" start");
+
+      MyMessage sensorTrippedMsg(id, V_TRIPPED);
+      gw.send(sensorTrippedMsg.set(1));
+      break;
+    }
+    //Sensor Motion Ended Event
+  case MotionSensor::SENSOR_MOTION_ENDED:
+    {
+      Serial.println(" end");
+
+      MyMessage sensorTrippedMsg(id, V_TRIPPED);
+      gw.send(sensorTrippedMsg.set(0));
+      break;
+    }
+  default:
+    {
+      Serial.print(" unknown ");
+      Serial.println(e.state);
+    }
+  }
+
+  return 0;
 }
