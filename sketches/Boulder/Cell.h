@@ -1,7 +1,6 @@
 #pragma once
 
 #include <FastLED.h>
-#include "config.h"
 
 // defaults
 
@@ -55,7 +54,7 @@ public:
   // constructors
 
   Cell() {};
-  Cell(CRGB *leds) : leds(leds) {};
+  Cell(CRGB *leds, uint8_t numLeds) : leds(leds), numLeds(numLeds) {};
 
 
   // instance methods
@@ -83,6 +82,7 @@ private:
 
   // our slice of the LED array
   CRGB *leds = nullptr;
+  uint8_t numLeds = 0;
 
   // storage for the current time of the loop (ie. millis())
   uint32_t now = 0;

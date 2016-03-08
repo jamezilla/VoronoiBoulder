@@ -66,7 +66,7 @@ void setupCells() {
 
   for (uint8_t i = 0; i < numCells; i++) {
     CRGB *nodeStart = &(leds[i * sliceSize]);
-    cells[i] = Cell(nodeStart);
+    cells[i] = Cell(nodeStart, sliceSize);
     // cells[i].setHueInterval(i*7+20);
     // cells[i].setValueMode(Cell::ModeSinusoidal);
     // cells[i].setValueInterval(i*33);

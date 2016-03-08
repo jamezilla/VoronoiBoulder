@@ -142,7 +142,7 @@ void Cell::updateChannel(Channel &channel) {
 
 
 void Cell::updateLeds() {
-  for (uint8_t j = 0; j < LEDS_PER_CELL; j++) {
+  for (uint8_t j = 0; j < this->numLeds; j++) {
     this->leds[j] = CHSV(this->hue.value, this->saturation.value, this->value.value);
   }
 }
