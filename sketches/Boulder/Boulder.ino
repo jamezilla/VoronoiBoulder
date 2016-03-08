@@ -8,15 +8,16 @@
 
 // the address in EEPROM where we store the cell count
 #define NUM_CELLS_ADDR 0
+#define NUM_LEDS_ADDR  1
 
 //
 // Variables
 //
 
-uint16_t      numLEDs;
+uint16_t      numLeds;
 uint8_t       numCells;
 CRGB          *leds;
-Cell        *cells;
+Cell          *cells;
 SerialCommand sCmd;
 
 
@@ -36,7 +37,9 @@ void setup() {
   setupSerialCommands();
 
   Serial.print(numCells);
-  Serial.println(" cells started");
+  Serial.print(" cells ");
+  Serial.print(numLeds);
+  Serial.print(" leds");
 }
 
 
@@ -53,14 +56,16 @@ void loop() {
 
 
 void setupFastLED() {
-  FastLED.addLeds<WS2812B, 6, RGB>(leds, numLEDs).setCorrection(TypicalLEDStrip);
+  FastLED.addLeds<WS2812B, 6, RGB>(leds, numLeds).setCorrection(TypicalLEDStrip);
   FastLED.setBrightness(BRIGHTNESS);
 }
 
 
 void setupCells() {
+  uint8_t sliceSize = numLeds / numCells;
+
   for (uint8_t i = 0; i < numCells; i++) {
-    CRGB *nodeStart = &(leds[i * LEDS_PER_CELL]);
+    CRGB *nodeStart = &(leds[i * sliceSize]);
     cells[i] = Cell(nodeStart);
     // cells[i].setHueInterval(i*7+20);
     // cells[i].setValueMode(Cell::ModeSinusoidal);
@@ -70,26 +75,38 @@ void setupCells() {
 
 
 void setupSerialCommands() {
-  sCmd.addCommand("cells", setCellCount);
-  sCmd.addCommand("reset", resetFunc);
-  sCmd.addCommand("set", setCell);
+  sCmd.addCommand("c", setCellCount);
+  sCmd.addCommand("l", setLedCount);
+  sCmd.addCommand("r", resetFunc);
   sCmd.setDefaultHandler(unrecognized);      // Handler for command that isn't matched
 }
 
 
 void setupStorage() {
+  uint8_t cellCount;
+  uint16_t ledCount;
+
   // Wait for EEPROM to be ready
   while (!eeprom_is_ready());
   cli();
-  numCells = EEPROM.read(NUM_CELLS_ADDR);
+  cellCount = EEPROM.read(NUM_CELLS_ADDR);
+  ledCount  = EEPROM.read(NUM_LEDS_ADDR);
   sei();
-  cells    = new Cell[numCells];
-  numLEDs    = numCells * LEDS_PER_CELL;
-  leds       = new CRGB[numLEDs];
-}
 
-void setCell() {
+  if (cellCount == NULL || cellCount == 0) {
+    numCells = 1;
+  } else {
+    numCells = cellCount;
+  }
 
+  if (ledCount == NULL || ledCount == 0) {
+    numLeds = numCells;
+  } else {
+    numLeds = ledCount;
+  }
+
+  cells = new Cell[numCells];
+  leds  = new CRGB[numLeds];
 }
 
 void setCellCount() {
@@ -97,13 +114,13 @@ void setCellCount() {
   char *arg = sCmd.next();
 
   if (arg == NULL) {
-    Serial.println("No arguments to 'cells'");
+    Serial.println("No arguments to 'c'");
     return;
   }
 
   cellCount = atoi(arg);
   if (cellCount < 0 || cellCount > UINT8_MAX) {
-    Serial.println("Got a weird number for 'cells'");
+    Serial.println("Got a weird number for 'c'");
     return;
   }
 
@@ -116,6 +133,29 @@ void setCellCount() {
   Serial.println("don't forget to 'reset'...");
 }
 
+void setLedCount() {
+  int ledCount;
+  char *arg = sCmd.next();
+
+  if (arg == NULL) {
+    Serial.println("No arguments to 'l'");
+    return;
+  }
+
+  ledCount = atoi(arg);
+  if (ledCount < 0 || ledCount > UINT8_MAX) {
+    Serial.println("Got a weird number for 'l'");
+    return;
+  }
+
+  while (!eeprom_is_ready());
+  cli();
+  EEPROM.update(NUM_LEDS_ADDR, ledCount);
+  sei();
+  Serial.print("leds: ");
+  Serial.println(ledCount);
+  Serial.println("don't forget to 'reset'...");
+}
 
 // This gets set as the default handler, and gets called when no other command matches.
 void unrecognized(const char *command) {
