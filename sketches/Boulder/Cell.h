@@ -5,15 +5,15 @@
 // defaults
 
 #define HUE_VALUE_MODE           ModeConstant
-#define HUE_INTERVAL             500U
-#define HUE_INTERVAL_MODE        ModeSinusoidal
+#define HUE_INTERVAL             10U
+#define HUE_INTERVAL_MODE        ModeConstant
 
 #define SATURATION_VALUE_MODE    ModeConstant
 #define SATURATION_INTERVAL      10U
 #define SATURATION_INTERVAL_MODE ModeConstant
 
 #define VALUE_VALUE_MODE         ModeConstant
-#define VALUE_INTERVAL           10U
+#define VALUE_INTERVAL           1U
 #define VALUE_INTERVAL_MODE      ModeConstant
 
 
@@ -67,6 +67,7 @@ public:
   void setHueMode(Mode mode);
   void setHueMin(uint8_t hueMin);
   void setHueMax(uint8_t hueMax);
+  void setHueNoiseSeed(uint16_t seed);
 
   void setSaturation(uint8_t saturation);
   void setSaturationInterval(uint16_t interval);

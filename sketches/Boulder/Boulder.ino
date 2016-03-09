@@ -1,36 +1,37 @@
-#include <avr/eeprom.h>
-#include <avr/interrupt.h>
-#include <EEPROM.h>
+#define USE_SERIAL_CMDS
+
 #include <FastLED.h>
 #include <MotionSensor.h>
 #include <MySensor.h>
-#include <SerialCommand.h>
 #include <SPI.h>
 #include "config.h"
 #include "power_mgt.h"
 #include "Cell.h"
+#include "ColorWhipe.h"
 
+#ifdef USE_SERIAL_CMDS
+#include <SerialCommand.h>
+#endif
 
-#define BOULDER_ID 1
-#define NUMSENSORS 1
-#define PAUSETIME  1000
+typedef enum PaintMode {
+  ModeDoNothing = 0,
+  ModeManual,
+  ModeColorWhipe,
+} PaintMode;
 
-// the address in EEPROM where we store the cell count
-#define NUM_CELLS_ADDR 0
-#define NUM_LEDS_ADDR  1
 
 //
 // Variables
 //
 
-uint16_t      numLeds;                  // total # of leds on the strand
-uint8_t       numCells;                 // number of cells on the whole boulder
-CRGB          *leds;
-Cell          *cells;
-MotionSensor  sensors[NUMSENSORS];     // motion sensors
-MySensor      gw;                      // radio
+CRGB          leds[NUM_LEDS];
+Cell          cells[NUM_CELLS];
+MotionSensor  sensors[NUM_SENSORS];     // motion sensors
+MySensor      gw;                       // radio
 SerialCommand sCmd;                     // command processor
-bool          ripple = false;
+
+PaintMode     paintMode = ModeColorWhipe;
+ColorWhipe    colorWhipe(leds);
 
 //
 // Functions
@@ -42,21 +43,27 @@ void(* resetFunc) (void) = 0;
 void setup() {
   Serial.begin(115200);
 
-  setupStorage();   // always do this first
+  // setupStorage();   // always do this first
   setupFastLED();
   setupCells();
+
+  colorWhipe.setColor(CHSV(random8(), 208, UINT8_MAX));
+  colorWhipe.setInterval(250);
+
 
   //Config Radio Communication
   gw.begin(onIncomingMessageEvent,BOULDER_ID);
   gw.sendSketchInfo("BoulderFirmware", "0.1");
 
   setupSensors();
-  setupSerialCommands();
 
-  Serial.print(numCells);
+#ifdef USE_SERIAL_CMDS
+  setupSerialCommands();
+  Serial.print(NUM_CELLS);
   Serial.print(" cells ");
-  Serial.print(numLeds);
+  Serial.print(NUM_LEDS);
   Serial.print(" leds");
+#endif
 }
 
 
@@ -64,7 +71,7 @@ void loop() {
   uint32_t now = millis();
 
   // update sensors
-  for (int i = 0; i < NUMSENSORS; i++) {
+  for (int i = 0; i < NUM_SENSORS; i++) {
     sensors[i].updateSensor();
   }
 
@@ -72,8 +79,23 @@ void loop() {
   gw.process();
 
   // update leds
-  for (uint8_t i = 0; i < numCells; i++) {
-    cells[i].update(now);
+  switch(paintMode) {
+  case ModeColorWhipe:
+    colorWhipe.update();
+    break;
+  case ModeManual:
+    for (uint8_t i = 0; i < NUM_CELLS; i++) {
+      cells[i].update(now);
+    }
+    break;
+  case ModeDoNothing:
+  default:
+    // noop
+    break;
+  }
+
+  if (0 == colorWhipe.getCurrentPixelIndex()) {
+    colorWhipe.setColor(CHSV(random8(), 208, UINT8_MAX));
   }
 
 #ifdef PWRMGT
@@ -82,16 +104,18 @@ void loop() {
   FastLED.show();
 #endif
 
+#ifdef USE_SERIAL_CMDS
   // process any serial commands
   sCmd.readSerial();
+#endif
 }
 
 
 void setupFastLED() {
 #ifdef CHIP_APA102
-  FastLED.addLeds<APA102, 6, 7>(leds, numLeds).setCorrection(TypicalLEDStrip);
+  FastLED.addLeds<APA102, 6, 7>(leds, NUM_LEDS).setCorrection(TypicalLEDStrip);
 #else
-  FastLED.addLeds<WS2812B, 6, RGB>(leds, numLeds).setCorrection(TypicalLEDStrip);
+  FastLED.addLeds<WS2812B, 6, RGB>(leds, NUM_LEDS).setCorrection(TypicalLEDStrip);
 #endif
 
 #ifdef PWRMGT
@@ -103,120 +127,24 @@ void setupFastLED() {
 
 
 void setupCells() {
-  uint8_t sliceSize = numLeds / numCells;
+  uint8_t sliceSize = NUM_LEDS / NUM_CELLS;
+  Serial.print("sliceSize: ");
+  Serial.println(sliceSize);
 
-  for (uint8_t i = 0; i < numCells; i++) {
-    CRGB *nodeStart = &(leds[i * sliceSize]);
+  for (uint8_t i = 0; i < NUM_CELLS; i++) {
+    CRGB *nodeStart = leds + (i * sliceSize);
     cells[i] = Cell(nodeStart, sliceSize);
-    cells[i].setHue(128);
-    cells[i].setHueMode(Cell::ModePerlin);
-    cells[i].setValueMode(Cell::ModeSawtooth);
-    cells[i].setValueInterval(1);
-    cells[i].setValueMin(200);
-    cells[i].setValueMax(UINT8_MAX);
-    // cells[i].setHueInterval(i*7+20);
-    // cells[i].setValueMode(Cell::ModeSinusoidal);
-    // cells[i].setValueInterval(i*33);
   }
 }
 
 
 void setupSensors() {
-  for (int i = 0; i < NUMSENSORS; i++) {
+  for (int i = 0; i < NUM_SENSORS; i++) {
     sensors[i] = MotionSensor(i, i+2, 30000);
     sensors[i].setPauseTime(PAUSETIME);
     sensors[i].setMotionSensorDelegate(onMotionSensorEvent);
     gw.present(i, S_MOTION);
   }
-}
-
-
-void setupSerialCommands() {
-  sCmd.addCommand("c", setCellCount);
-  sCmd.addCommand("l", setLedCount);
-  sCmd.addCommand("r", resetFunc);
-  sCmd.setDefaultHandler(unrecognized);      // Handler for command that isn't matched
-}
-
-
-void setupStorage() {
-  uint8_t cellCount;
-  uint16_t ledCount;
-
-  // Wait for EEPROM to be ready
-  while (!eeprom_is_ready());
-  cli();
-  cellCount = EEPROM.read(NUM_CELLS_ADDR);
-  ledCount  = EEPROM.read(NUM_LEDS_ADDR);
-  sei();
-
-  if (cellCount == NULL || cellCount == 0) {
-    numCells = 1;
-  } else {
-    numCells = cellCount;
-  }
-
-  if (ledCount == NULL || ledCount == 0) {
-    numLeds = numCells;
-  } else {
-    numLeds = ledCount;
-  }
-
-  cells = new Cell[numCells];
-  leds  = new CRGB[numLeds];
-}
-
-void setCellCount() {
-  int cellCount;
-  char *arg = sCmd.next();
-
-  if (arg == NULL) {
-    Serial.println("No arguments to 'c'");
-    return;
-  }
-
-  cellCount = atoi(arg);
-  if (cellCount < 0 || cellCount > UINT8_MAX) {
-    Serial.println("Got a weird number for 'c'");
-    return;
-  }
-
-  while (!eeprom_is_ready());
-  cli();
-  EEPROM.update(NUM_CELLS_ADDR, cellCount);
-  sei();
-  Serial.print("cells: ");
-  Serial.println(cellCount);
-  Serial.println("don't forget to 'reset'...");
-}
-
-void setLedCount() {
-  int ledCount;
-  char *arg = sCmd.next();
-
-  if (arg == NULL) {
-    Serial.println("No arguments to 'l'");
-    return;
-  }
-
-  ledCount = atoi(arg);
-  if (ledCount < 0 || ledCount > UINT8_MAX) {
-    Serial.println("Got a weird number for 'l'");
-    return;
-  }
-
-  while (!eeprom_is_ready());
-  cli();
-  EEPROM.update(NUM_LEDS_ADDR, ledCount);
-  sei();
-  Serial.print("leds: ");
-  Serial.println(ledCount);
-  Serial.println("don't forget to 'reset'...");
-}
-
-// This gets set as the default handler, and gets called when no other command matches.
-void unrecognized(const char *command) {
-  Serial.println("What?");
 }
 
 
@@ -230,6 +158,40 @@ void onIncomingMessageEvent(const MyMessage &message) {
 
 }
 
+void calibrating() {
+  cells[0].setHue(255);
+  cells[1].setHue(64);
+  cells[2].setHue(128);
+}
+
+void active() {
+  for (uint8_t i = 0; i < NUM_CELLS; i++) {
+    cells[i].setHue(64);
+  }
+}
+
+void detected() {
+  cells[0].setHue(0);
+  cells[1].setHue(64);
+  cells[2].setHue(128);
+}
+
+void ended() {
+  for (uint8_t i = 0; i < NUM_CELLS; i++) {
+    cells[i].setHue(192);
+  }
+}
+
+// acknowledge first trigger
+// accumulate triggers until you reach a threshold, then explosion/glitter, then back to a steady state
+
+// bubbling up - slow fade from bottom
+// each trigger: snake up
+
+// random fade in each cell
+
+// ripple
+
 //Motion Sensor Event/////////////////////////////////////////
 int onMotionSensorEvent(const MotionSensor::sensorEventArgs e) {
 
@@ -237,20 +199,22 @@ int onMotionSensorEvent(const MotionSensor::sensorEventArgs e) {
   int state = e.state;
   unsigned long timeStamp = e.timeStamp;
 
-  Serial.print("Sensor ");
-  Serial.print(id);
+  // Serial.print("Sensor ");
+  // Serial.print(id);
 
   switch (state) {
   //Sensor Calibrating Event
   case MotionSensor::SENSOR_MOTION_CALIBRATING:
     {
-      Serial.println(" calibrating");
+      // Serial.println(" calibrating");
+      // calibrating();
       break;
     }
     // Sensor Armed Event
   case MotionSensor::SENSOR_MOTION_ACTIVE:
     {
-      Serial.println(" active");
+      // Serial.println(" active");
+      // active();
 
       MyMessage sensorArmedMsg(id, V_ARMED);
       gw.send(sensorArmedMsg.set(1));
@@ -259,7 +223,8 @@ int onMotionSensorEvent(const MotionSensor::sensorEventArgs e) {
     //Sensor Motion Detected Event
   case MotionSensor::SENSOR_MOTION_DETECTED:
     {
-      Serial.println(" start");
+      // Serial.println(" detected");
+      // detected();
 
       MyMessage sensorTrippedMsg(id, V_TRIPPED);
       gw.send(sensorTrippedMsg.set(1));
@@ -268,7 +233,8 @@ int onMotionSensorEvent(const MotionSensor::sensorEventArgs e) {
     //Sensor Motion Ended Event
   case MotionSensor::SENSOR_MOTION_ENDED:
     {
-      Serial.println(" end");
+      // Serial.println(" ended");
+      // ended();
 
       MyMessage sensorTrippedMsg(id, V_TRIPPED);
       gw.send(sensorTrippedMsg.set(0));
@@ -276,10 +242,50 @@ int onMotionSensorEvent(const MotionSensor::sensorEventArgs e) {
     }
   default:
     {
-      Serial.print(" unknown ");
-      Serial.println(e.state);
+      // Serial.print(" unknown ");
+      // Serial.println(e.state);
     }
   }
 
   return 0;
 }
+
+
+#ifdef USE_SERIAL_CMDS
+
+void setPaintMode() {
+  int mode;
+  char *arg = sCmd.next();
+
+  if (arg == NULL) {
+    Serial.println("No arguments to 'm'");
+    return;
+  }
+
+  switch(atoi(arg)) {
+  case ModeDoNothing:
+    paintMode = ModeDoNothing;
+    break;
+  case ModeColorWhipe:
+    paintMode = ModeColorWhipe;
+    break;
+  default:
+    Serial.print("illegal mode: ");
+    Serial.println(arg);
+  }
+}
+
+
+// This gets set as the default handler, and gets called when no other command matches.
+void unrecognized(const char *command) {
+  Serial.println("What?");
+}
+
+
+void setupSerialCommands() {
+  sCmd.addCommand("m", setPaintMode);
+  sCmd.addCommand("r", resetFunc);
+  sCmd.setDefaultHandler(unrecognized);      // Handler for command that isn't matched
+}
+
+#endif

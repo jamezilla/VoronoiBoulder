@@ -34,6 +34,9 @@ void Cell::setHueMode(Mode mode) {
   this->hue.valueMode = mode;
 }
 
+void Cell::setHueNoiseSeed(uint16_t seed) {
+  this->hue.valueNoiseSeed = seed;
+}
 
 //
 // Saturation
@@ -185,11 +188,12 @@ void Cell::updateChannel(Channel &channel) {
 
 void Cell::updateLeds() {
   // map the numbers so they're between min/max for each channel
-  uint8_t hue = map(this->hue.value, 0, UINT8_MAX, this->hue.valueMin, this->hue.valueMax);
-  uint8_t saturation = map(this->saturation.value, 0, UINT8_MAX, this->saturation.valueMin, this->saturation.valueMax);
-  uint8_t value = map(this->value.value, 0, UINT8_MAX, this->value.valueMin, this->value.valueMax);
+  // uint8_t hue = map(this->hue.value, 0, UINT8_MAX, this->hue.valueMin, this->hue.valueMax);
+  // uint8_t saturation = map(this->saturation.value, 0, UINT8_MAX, this->saturation.valueMin, this->saturation.valueMax);
+  // uint8_t value = map(this->value.value, 0, UINT8_MAX, this->value.valueMin, this->value.valueMax);
 
   for (uint8_t j = 0; j < this->numLeds; j++) {
-    this->leds[j] = CHSV(hue, saturation, value);
+    // this->leds[j] = CHSV(hue, saturation, value);
+    this->leds[j] = CHSV(this->hue.value, this->saturation.value, this->value.value);
   }
 }
