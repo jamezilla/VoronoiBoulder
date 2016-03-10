@@ -1,4 +1,4 @@
-//#define USE_SERIAL_CMDS
+// #define USE_SERIAL_CMDS
 
 #include <FastLED.h>
 #include <MotionSensor.h>
@@ -20,7 +20,8 @@ typedef enum PaintMode {
   ModeFillGradient,
   ModeLightning,
   ModeMover,
-  ModeRainbowBeat
+  ModeRainbowBeat,
+  ModeSize                          // not an actual mode, just a shortcut to get the # of modes
 } PaintMode;
 
 
@@ -170,7 +171,57 @@ void setupSensors() {
 }
 
 
-// Routines
+// Modes
+
+void setPaintMode(PaintMode mode) {
+  switch(mode) {
+  case ModeDoNothing:
+    paintMode = ModeDoNothing;
+    Serial.println("ModeDoNothing");
+    break;
+
+  case ModeAlternateDriftSinusoidal:
+    paintMode = ModeAlternateDriftSinusoidal;
+    for (uint8_t i = 0; i < NUM_CELLS; i++) {
+      cells[i].setHue(random8());
+      cells[i].setHueMode(Cell::ModeAlternateDrift);
+      cells[i].setHueInterval(500U);
+      cells[i].setHueIntervalMode(Cell::ModeSinusoidal);
+      cells[i].setSaturationMode(Cell::ModeConstant);
+      cells[i].setSaturationIntervalMode(Cell::ModeConstant);
+      cells[i].setValueMode(Cell::ModeConstant);
+      cells[i].setValueIntervalMode(Cell::ModeConstant);
+    }
+    Serial.println("ModeAlternateDriftSinusoidal");
+    break;
+
+  case ModeColorWipe:
+    paintMode = ModeColorWipe;
+    Serial.println("ModeColorWipe");
+    break;
+
+  case ModeRainbowBeat:
+    paintMode = ModeRainbowBeat;
+    Serial.println("ModeRainbowBeat");
+    break;
+
+  case ModeMover:
+    paintMode = ModeMover;
+    Serial.println("ModeMover");
+    break;
+
+  case ModeLightning:
+    setBlack();
+    paintMode = ModeLightning;
+    Serial.println("ModeLightning");
+    break;
+
+  case ModeFillGradient:
+    paintMode = ModeFillGradient;
+    Serial.println("ModeFillGradient");
+    break;
+  }
+}
 
 void ManualUpdate() {
   uint32_t now = millis();
@@ -241,7 +292,7 @@ void FillGradient(){
 }
 
 void setBlack() {
-  for (int i = 0; i < NUM_CELLS; i++) {
+  for (int i = 0; i < NUM_LEDS; i++) {
     leds[i] = CRGB::Black;
   }
 }
@@ -350,7 +401,7 @@ int onMotionSensorEvent(const MotionSensor::sensorEventArgs e) {
 
 #ifdef USE_SERIAL_CMDS
 
-void setPaintMode() {
+void setPaintModeFromSerial() {
   int mode;
   char *arg = sCmd.next();
 
@@ -359,57 +410,12 @@ void setPaintMode() {
     return;
   }
 
-  switch(atoi(arg)) {
-  case ModeDoNothing:
-    paintMode = ModeDoNothing;
-    Serial.println("ModeDoNothing");
-    break;
-
-  case ModeAlternateDriftSinusoidal:
-    paintMode = ModeAlternateDriftSinusoidal;
-    for (uint8_t i = 0; i < NUM_CELLS; i++) {
-      cells[i].setHue(random8());
-      cells[i].setHueMode(Cell::ModeAlternateDrift);
-      cells[i].setHueInterval(500U);
-      cells[i].setHueIntervalMode(Cell::ModeSinusoidal);
-      cells[i].setSaturationMode(Cell::ModeConstant);
-      cells[i].setSaturationIntervalMode(Cell::ModeConstant);
-      cells[i].setValueMode(Cell::ModeConstant);
-      cells[i].setValueIntervalMode(Cell::ModeConstant);
-    }
-    Serial.println("ModeAlternateDriftSinusoidal");
-    break;
-
-  case ModeColorWipe:
-    paintMode = ModeColorWipe;
-    Serial.println("ModeColorWipe");
-    break;
-
-  case ModeRainbowBeat:
-    paintMode = ModeRainbowBeat;
-    Serial.println("ModeRainbowBeat");
-    break;
-
-  case ModeMover:
-    paintMode = ModeMover;
-    Serial.println("ModeMover");
-    break;
-
-  case ModeLightning:
-    setBlack();
-    paintMode = ModeLightning;
-    Serial.println("ModeLightning");
-    break;
-
-  case ModeFillGradient:
-    paintMode = ModeFillGradient;
-    Serial.println("ModeFillGradient");
-    break;
-
-  default:
-    Serial.print("illegal mode: ");
-    Serial.println(arg);
+  mode = atoi(arg);
+  if (mode < 0 || mode >= ModeSize) {
+    Serial.println("not a valid mode");
+    return;
   }
+  setPaintMode(static_cast<PaintMode>(mode));
 }
 
 
@@ -420,7 +426,7 @@ void unrecognized(const char *command) {
 
 
 void setupSerialCommands() {
-  sCmd.addCommand("m", setPaintMode);
+  sCmd.addCommand("m", setPaintModeFromSerial);
   sCmd.addCommand("r", resetFunc);
   sCmd.setDefaultHandler(unrecognized);      // Handler for command that isn't matched
 }
