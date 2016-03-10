@@ -7,7 +7,7 @@
 #include "config.h"
 #include "power_mgt.h"
 #include "Cell.h"
-#include "ColorWhipe.h"
+#include "ColorWipe.h"
 
 #ifdef USE_SERIAL_CMDS
 #include <SerialCommand.h>
@@ -16,7 +16,7 @@
 typedef enum PaintMode {
   ModeDoNothing = 0,
   ModeManual,
-  ModeColorWhipe,
+  ModeColorWipe,
 } PaintMode;
 
 
@@ -30,8 +30,8 @@ MotionSensor  sensors[NUM_SENSORS];     // motion sensors
 MySensor      gw;                       // radio
 SerialCommand sCmd;                     // command processor
 
-PaintMode     paintMode = ModeColorWhipe;
-ColorWhipe    colorWhipe(leds);
+PaintMode     paintMode = ModeColorWipe;
+ColorWipe    colorWipe(leds);
 
 //
 // Functions
@@ -47,8 +47,8 @@ void setup() {
   setupFastLED();
   setupCells();
 
-  colorWhipe.setColor(CHSV(random8(), 208, UINT8_MAX));
-  colorWhipe.setInterval(250);
+  colorWipe.setColor(CHSV(random8(), 208, UINT8_MAX));
+  colorWipe.setInterval(250);
 
 
   //Config Radio Communication
@@ -80,8 +80,8 @@ void loop() {
 
   // update leds
   switch(paintMode) {
-  case ModeColorWhipe:
-    colorWhipe.update();
+  case ModeColorWipe:
+    colorWipe.update();
     break;
   case ModeManual:
     for (uint8_t i = 0; i < NUM_CELLS; i++) {
@@ -94,8 +94,8 @@ void loop() {
     break;
   }
 
-  if (0 == colorWhipe.getCurrentPixelIndex()) {
-    colorWhipe.setColor(CHSV(random8(), 208, UINT8_MAX));
+  if (0 == colorWipe.getCurrentPixelIndex()) {
+    colorWipe.setColor(CHSV(random8(), 208, UINT8_MAX));
   }
 
 #ifdef PWRMGT
@@ -266,8 +266,8 @@ void setPaintMode() {
   case ModeDoNothing:
     paintMode = ModeDoNothing;
     break;
-  case ModeColorWhipe:
-    paintMode = ModeColorWhipe;
+  case ModeColorWipe:
+    paintMode = ModeColorWipe;
     break;
   default:
     Serial.print("illegal mode: ");

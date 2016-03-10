@@ -1,31 +1,31 @@
-#include "ColorWhipe.h"
+#include "ColorWipe.h"
 
-uint16_t ColorWhipe::getCurrentPixelIndex() {
+uint16_t ColorWipe::getCurrentPixelIndex() {
   return this->currentPixelIndex;
 }
 
 
-void ColorWhipe::resetPixelIndex() {
+void ColorWipe::resetPixelIndex() {
   this->currentPixelIndex = 0;
 }
 
 
-void ColorWhipe::setColor(CHSV color) {
+void ColorWipe::setColor(CHSV color) {
   this->color = color;
 }
 
 
-void ColorWhipe::setCurrentPixelIndex(uint16_t index) {
+void ColorWipe::setCurrentPixelIndex(uint16_t index) {
   this->currentPixelIndex = index;
 }
 
 
-void ColorWhipe::setInterval(uint16_t interval) {
+void ColorWipe::setInterval(uint16_t interval) {
   this->interval = interval;
 }
 
 
-void ColorWhipe::update() {
+void ColorWipe::update() {
   uint32_t now = millis();
 
   if ((now - previousUpdate) < interval) {

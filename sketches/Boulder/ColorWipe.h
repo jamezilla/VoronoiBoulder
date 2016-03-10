@@ -2,10 +2,10 @@
 #include <FastLED.h>
 #include "config.h"
 
-class ColorWhipe {
+class ColorWipe {
 
 public:
-  ColorWhipe(CRGB *leds) : leds(leds) {};
+  ColorWipe(CRGB *leds) : leds(leds) {};
 
   uint16_t  getCurrentPixelIndex();
   void      resetPixelIndex();
