@@ -40,12 +40,8 @@ ColorWipe     colorWipe(leds);
 SerialCommand sCmd;                     // command processor
 #endif
 
-//
-// Functions
-//
-
+// reboot
 void(* resetFunc) (void) = 0;
-
 
 void setup() {
   Serial.begin(115200);
@@ -117,6 +113,8 @@ void loop() {
     break;
   }
 
+  // this could probably go in the ColorWipe update() method, but keeping it
+  // here for flexibility in setting the next color
   if (0 == colorWipe.getCurrentPixelIndex()) {
     colorWipe.setColor(CHSV(random8(), 224, UINT8_MAX));
   }
@@ -132,6 +130,12 @@ void loop() {
   sCmd.readSerial();
 #endif
 }
+
+
+
+//
+// Initialization helpers
+//
 
 
 void setupFastLED() {
@@ -171,7 +175,10 @@ void setupSensors() {
 }
 
 
+
+//
 // Modes
+//
 
 void setPaintMode(PaintMode mode) {
   switch(mode) {
@@ -223,12 +230,20 @@ void setPaintMode(PaintMode mode) {
   }
 }
 
+
+// this isn't a canned routine - you have to explicitly setup each Cell with the
+// params you want (see ModeAlternateDriftSinusoidal case in setPaintMode()),
+// then call this in the loop() function to update the LEDs
+
 void ManualUpdate() {
   uint32_t now = millis();
   for (uint8_t i = 0; i < NUM_CELLS; i++) {
     cells[i].update(now);
   }
 }
+
+
+// adapted from https://github.com/atuline/FastLED-Demos/blob/master/rainbow_beat/rainbow_beat.ino
 
 void RainbowBeat() {
   uint8_t beatA = beatsin8(5, 0, 255);                        // Starting hue
@@ -237,8 +252,11 @@ void RainbowBeat() {
 }
 
 
+// adapted from https://github.com/atuline/FastLED-Demos/blob/master/mover/mover.ino
 // TODO: parameterize the fade
-#define MOVER_FADE 64                 // Low values = slower fade
+
+#define MOVER_FADE 64 // Low values = slower fade
+
 void Mover(){
   static uint16_t i = 0;
   static uint8_t hue = 0;
@@ -256,8 +274,11 @@ void Mover(){
 }
 
 
-#define FREQUENCY 50                                       // controls the interval between strikes
+// adapted from https://github.com/atuline/FastLED-Demos/blob/master/lightnings/lightnings.ino
+
+#define FREQUENCY 50  // controls the interval between strikes
 #define FLASHES   8
+
 void Lightning(){
   static unsigned int dimmer = 1;
   static uint8_t ledstart;                                             // Starting location of a flash
@@ -281,6 +302,9 @@ void Lightning(){
   }
 }
 
+
+// adapted from https://github.com/atuline/FastLED-Demos/blob/master/fill_grad/fill_grad.ino
+
 void FillGradient(){
   uint8_t starthue = beatsin8(20, 0, 255);
   uint8_t endhue = beatsin8(35, 0, 255);
@@ -291,11 +315,21 @@ void FillGradient(){
   }
 }
 
+
+// helper to set everything to black
+
 void setBlack() {
   for (int i = 0; i < NUM_LEDS; i++) {
     leds[i] = CRGB::Black;
   }
 }
+
+
+
+//
+// Events
+//
+
 
 //Radio Event/////////////////////////////////////////////////
 void onIncomingMessageEvent(const MyMessage &message) {
@@ -307,41 +341,16 @@ void onIncomingMessageEvent(const MyMessage &message) {
 
 }
 
-void calibrating() {
-  cells[0].setHue(255);
-  cells[1].setHue(64);
-  cells[2].setHue(128);
-}
-
-void active() {
-  for (uint8_t i = 0; i < NUM_CELLS; i++) {
-    cells[i].setHue(64);
-  }
-}
-
-void detected() {
-  cells[0].setHue(0);
-  cells[1].setHue(64);
-  cells[2].setHue(128);
-}
-
-void ended() {
-  for (uint8_t i = 0; i < NUM_CELLS; i++) {
-    cells[i].setHue(192);
-  }
-}
-
-// acknowledge first trigger
-// accumulate triggers until you reach a threshold, then explosion/glitter, then back to a steady state
-
-// bubbling up - slow fade from bottom
-// each trigger: snake up
-
-// random fade in each cell
-
-// ripple
-
 //Motion Sensor Event/////////////////////////////////////////
+
+// NOTES:
+// 1) acknowledge first trigger
+//    accumulate triggers until you reach a threshold, then explosion/glitter, then back to a steady state
+// 2) bubbling up - slow fade from bottom
+//    each trigger: snake up
+// 3) random fade in each cell
+// 4) ripple
+
 int onMotionSensorEvent(const MotionSensor::sensorEventArgs e) {
 
   int id = e.id;
@@ -352,45 +361,35 @@ int onMotionSensorEvent(const MotionSensor::sensorEventArgs e) {
   // Serial.print(id);
 
   switch (state) {
-  //Sensor Calibrating Event
   case MotionSensor::SENSOR_MOTION_CALIBRATING:
     {
       // Serial.println(" calibrating");
-      // calibrating();
       break;
     }
-    // Sensor Armed Event
   case MotionSensor::SENSOR_MOTION_ACTIVE:
     {
       // Serial.println(" active");
-      // active();
-
       MyMessage sensorArmedMsg(id, V_ARMED);
       gw.send(sensorArmedMsg.set(1));
       break;
     }
-    //Sensor Motion Detected Event
   case MotionSensor::SENSOR_MOTION_DETECTED:
     {
       // Serial.println(" detected");
-      // detected();
-
       MyMessage sensorTrippedMsg(id, V_TRIPPED);
       gw.send(sensorTrippedMsg.set(1));
       break;
     }
-    //Sensor Motion Ended Event
   case MotionSensor::SENSOR_MOTION_ENDED:
     {
       // Serial.println(" ended");
-      // ended();
-
       MyMessage sensorTrippedMsg(id, V_TRIPPED);
       gw.send(sensorTrippedMsg.set(0));
       break;
     }
   default:
     {
+      // noop
       // Serial.print(" unknown ");
       // Serial.println(e.state);
     }
