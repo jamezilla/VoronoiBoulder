@@ -1,4 +1,4 @@
-#define USE_SERIAL_CMDS
+//#define USE_SERIAL_CMDS
 
 #include <FastLED.h>
 #include <MotionSensor.h>
@@ -14,7 +14,7 @@
 #endif
 
 typedef enum PaintMode {
-  ModeDoNothing = 0,
+  ModeDoNothing = 0,                // this will basically freeze the cells in their current state
   ModeAlternateDriftSinusoidal,
   ModeColorWipe,
   ModeFillGradient,
@@ -32,10 +32,12 @@ CRGB          leds[NUM_LEDS];
 Cell          cells[NUM_CELLS];
 MotionSensor  sensors[NUM_SENSORS];     // motion sensors
 MySensor      gw;                       // radio
-SerialCommand sCmd;                     // command processor
-
 PaintMode     paintMode = ModeColorWipe;
-ColorWipe    colorWipe(leds);
+ColorWipe     colorWipe(leds);
+
+#ifdef USE_SERIAL_CMDS
+SerialCommand sCmd;                     // command processor
+#endif
 
 //
 // Functions
