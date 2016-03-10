@@ -15,8 +15,12 @@
 
 typedef enum PaintMode {
   ModeDoNothing = 0,
-  ModeManual,
+  ModeAlternateDriftSinusoidal,
   ModeColorWipe,
+  ModeFillGradient,
+  ModeLightning,
+  ModeMover,
+  ModeRainbowBeat
 } PaintMode;
 
 
@@ -80,14 +84,30 @@ void loop() {
 
   // update leds
   switch(paintMode) {
+  case ModeAlternateDriftSinusoidal:
+    ManualUpdate();
+    break;
+
   case ModeColorWipe:
     colorWipe.update();
     break;
-  case ModeManual:
-    for (uint8_t i = 0; i < NUM_CELLS; i++) {
-      cells[i].update(now);
-    }
+
+  case ModeRainbowBeat:
+    RainbowBeat();
     break;
+
+  case ModeMover:
+    Mover();
+    break;
+
+  case ModeLightning:
+    Lightning();
+    break;
+
+  case ModeFillGradient:
+    FillGradient();
+    break;
+
   case ModeDoNothing:
   default:
     // noop
@@ -95,7 +115,7 @@ void loop() {
   }
 
   if (0 == colorWipe.getCurrentPixelIndex()) {
-    colorWipe.setColor(CHSV(random8(), 208, UINT8_MAX));
+    colorWipe.setColor(CHSV(random8(), 224, UINT8_MAX));
   }
 
 #ifdef PWRMGT
@@ -147,6 +167,82 @@ void setupSensors() {
   }
 }
 
+
+// Routines
+
+void ManualUpdate() {
+  uint32_t now = millis();
+  for (uint8_t i = 0; i < NUM_CELLS; i++) {
+    cells[i].update(now);
+  }
+}
+
+void RainbowBeat() {
+  uint8_t beatA = beatsin8(5, 0, 255);                        // Starting hue
+  uint8_t beatB = beatsin8(15, 4, 20);                        // Delta hue between LED's
+  fill_rainbow(leds, NUM_LEDS, beatA, beatB);                 // Use FastLED's fill_rainbow routine.
+}
+
+
+// TODO: parameterize the fade
+#define MOVER_FADE 64                 // Low values = slower fade
+void Mover(){
+  static uint16_t i = 0;
+  static uint8_t hue = 0;
+
+  EVERY_N_MILLISECONDS(100) {                                         // UGH!!!! A blocking delay. If you want to add controls, they may not work reliably.
+    leds[i] += CHSV(hue, 255, 255);
+    leds[(i+5) % NUM_LEDS] += CHSV(hue+85, 255, 255);         // We use modulus so that the location is between 0 and NUM_LEDS
+    leds[(i+10) % NUM_LEDS] += CHSV(hue+170, 255, 255);       // Same here.
+    show_at_max_brightness_for_power();
+    fadeToBlackBy(leds, NUM_LEDS, MOVER_FADE);
+    i++;
+    i %= NUM_LEDS;
+  }
+
+}
+
+
+#define FREQUENCY 50                                       // controls the interval between strikes
+#define FLASHES   8
+void Lightning(){
+  static unsigned int dimmer = 1;
+  static uint8_t ledstart;                                             // Starting location of a flash
+  static uint8_t ledlen;                                               // Length of a flash
+
+  EVERY_N_MILLISECONDS(random8(FREQUENCY)*100){          // delay between strikes
+    ledstart = random8(NUM_LEDS);           // Determine starting location of flash
+    ledlen = random8(NUM_LEDS-ledstart);    // Determine length of flash (not to go beyond NUM_LEDS-1)
+    for (int flashCounter = 0; flashCounter < random8(3,FLASHES); flashCounter++) {
+      EVERY_N_MILLISECONDS(50+random8(100)) {
+        if(flashCounter == 0) dimmer = 5;     // the brightness of the leader is scaled down by a factor of 5
+        else dimmer = random8(1,3);           // return strokes are brighter than the leader
+        fill_solid(leds+ledstart,ledlen,CHSV(255, 0, 255/dimmer));
+        FastLED.show();                       // Show a section of LED's
+        delay(random8(4,10));                 // each flash only lasts 4-10 milliseconds
+        fill_solid(leds+ledstart,ledlen,CHSV(255,0,0));   // Clear the section of LED's
+        FastLED.show();
+        if (flashCounter == 0) delay (150);   // longer delay until next flash after the leader
+      }
+    } // for()
+  }
+}
+
+void FillGradient(){
+  uint8_t starthue = beatsin8(20, 0, 255);
+  uint8_t endhue = beatsin8(35, 0, 255);
+  if (starthue < endhue) {
+    fill_gradient(leds, NUM_LEDS, CHSV(starthue,255,255), CHSV(endhue,255,255), FORWARD_HUES);    // If we don't have this, the colour fill will flip around
+  } else {
+    fill_gradient(leds, NUM_LEDS, CHSV(starthue,255,255), CHSV(endhue,255,255), BACKWARD_HUES);
+  }
+}
+
+void setBlack() {
+  for (int i = 0; i < NUM_CELLS; i++) {
+    leds[i] = CRGB::Black;
+  }
+}
 
 //Radio Event/////////////////////////////////////////////////
 void onIncomingMessageEvent(const MyMessage &message) {
@@ -250,7 +346,6 @@ int onMotionSensorEvent(const MotionSensor::sensorEventArgs e) {
   return 0;
 }
 
-
 #ifdef USE_SERIAL_CMDS
 
 void setPaintMode() {
@@ -265,10 +360,50 @@ void setPaintMode() {
   switch(atoi(arg)) {
   case ModeDoNothing:
     paintMode = ModeDoNothing;
+    Serial.println("ModeDoNothing");
     break;
+
+  case ModeAlternateDriftSinusoidal:
+    paintMode = ModeAlternateDriftSinusoidal;
+    for (uint8_t i = 0; i < NUM_CELLS; i++) {
+      cells[i].setHue(random8());
+      cells[i].setHueMode(Cell::ModeAlternateDrift);
+      cells[i].setHueInterval(500U);
+      cells[i].setHueIntervalMode(Cell::ModeSinusoidal);
+      cells[i].setSaturationMode(Cell::ModeConstant);
+      cells[i].setSaturationIntervalMode(Cell::ModeConstant);
+      cells[i].setValueMode(Cell::ModeConstant);
+      cells[i].setValueIntervalMode(Cell::ModeConstant);
+    }
+    Serial.println("ModeAlternateDriftSinusoidal");
+    break;
+
   case ModeColorWipe:
     paintMode = ModeColorWipe;
+    Serial.println("ModeColorWipe");
     break;
+
+  case ModeRainbowBeat:
+    paintMode = ModeRainbowBeat;
+    Serial.println("ModeRainbowBeat");
+    break;
+
+  case ModeMover:
+    paintMode = ModeMover;
+    Serial.println("ModeMover");
+    break;
+
+  case ModeLightning:
+    setBlack();
+    paintMode = ModeLightning;
+    Serial.println("ModeLightning");
+    break;
+
+  case ModeFillGradient:
+    paintMode = ModeFillGradient;
+    Serial.println("ModeFillGradient");
+    break;
+
   default:
     Serial.print("illegal mode: ");
     Serial.println(arg);
